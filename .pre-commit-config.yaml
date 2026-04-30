@@ -1,0 +1,20 @@
+repos:
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+        args: [-C, "3"]
+        types_or: [markdown, terraform]
+        additional_dependencies: [tomli]
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.104.0
+    hooks:
+      - id: terraform_fmt
+      - id: terraform_tflint
+      - id: terraform_validate
+      - id: terraform_docs
+        args:
+          - --args=--lockfile=false
+      - id: terraform_trivy
+        args:
+          - --args=--severity HIGH,CRITICAL --skip-dirs .terraform,examples/complete/.terraform
