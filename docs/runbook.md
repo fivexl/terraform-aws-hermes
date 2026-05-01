@@ -8,7 +8,7 @@ Before deploying, enable access to the Bedrock model(s) you plan to use:
 
 1. Go to the [Amazon Bedrock console](https://console.aws.amazon.com/bedrock/) in the configured region (default: us-east-1)
 2. Navigate to **Model access** in the left sidebar
-3. Request access to the configured model (default: `nvidia.nemotron-super-3-120b`)
+3. Request access to the configured model (default inference profile: `us.anthropic.claude-haiku-4-5-20251001-v1:0` in the Bedrock console / model access)
 4. Wait for access to be granted (usually immediate for most models)
 
 ### 2. Choose Messaging Channels

@@ -105,7 +105,7 @@ The module uses Amazon Bedrock for model inference. This means:
 - Model access is controlled through IAM, not secret rotation
 - The Bedrock region is configurable
 - Model discovery is enabled by default (configurable), allowing Hermes to auto-detect available models at runtime
-- A default model is configured for initial use
+- A default model is configured for initial use (default: Anthropic Claude Haiku 4.5 inference profile `us.anthropic.claude-haiku-4-5-20251001-v1:0`). IAM uses an **inference-profile** ARN for IDs that match a regional prefix (`xx.`, e.g. `us.anthropic...`), and the standard **foundation-model** ARN otherwise.
 
 ## Messaging: Slack (`slack_enabled`)
 

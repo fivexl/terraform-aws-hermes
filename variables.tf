@@ -96,9 +96,13 @@ variable "bedrock_region" {
 }
 
 variable "bedrock_model_id" {
-  description = "Default Bedrock model ID for Hermes inference."
+  description = <<-EOT
+    Default Bedrock model ID for Hermes inference (written to config.yaml).
+    Use a foundation model ID (e.g. nvidia.nemotron-super-3-120b) or a regional inference profile ID (e.g. us.anthropic.claude-haiku-4-5-20251001-v1:0).
+    IDs matching /^[a-z]{2}\\./ are treated as inference profiles for IAM and scoped to an inference-profile ARN in the current account.
+  EOT
   type        = string
-  default     = "nvidia.nemotron-super-3-120b"
+  default     = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 }
 
 variable "bedrock_discovery_enabled" {

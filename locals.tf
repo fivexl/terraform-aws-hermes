@@ -72,8 +72,13 @@ locals {
   # CloudWatch
   log_group_name = "/hermes/${var.name}"
 
-  # Bedrock model ARN for IAM scoping
-  bedrock_model_arn = "arn:aws:bedrock:${var.bedrock_region}::foundation-model/${var.bedrock_model_id}"
+  # Bedrock model ARN for IAM: foundation models use the account-less ARN; regional inference
+  # profile IDs (e.g. us.anthropic.*) require ...:inference-profile/<id> in the caller's account.
+  bedrock_model_arn = (
+    can(regex("^[a-z]{2}\\.", var.bedrock_model_id))
+    ? "arn:aws:bedrock:${var.bedrock_region}:${data.aws_caller_identity.current.account_id}:inference-profile/${var.bedrock_model_id}"
+    : "arn:aws:bedrock:${var.bedrock_region}::foundation-model/${var.bedrock_model_id}"
+  )
 
   # Container image reference
   hermes_image = "nousresearch/hermes-agent:${var.hermes_version}"

@@ -303,7 +303,7 @@ The persistent volume (`/var/lib/hermes` on host, `/opt/data` in container) hold
 
 - default region: `us-east-1`
 - a single default model configured in `config.yaml`
-- default model: `nvidia.nemotron-super-3-120b`
+- default model: `us.anthropic.claude-haiku-4-5-20251001-v1:0`
 - callers can override both region and default model
 
 ### Model Discovery
@@ -456,7 +456,7 @@ This module should follow the same general principles as the referenced `terrafo
 - localhost-bound dashboard on port 9119 (no authentication)
 - optional API server on port 8642 (bearer token auth, disabled by default)
 - Slack Socket Mode support with configurable `SLACK_HOME_CHANNEL` and `SLACK_ALLOWED_USERS`
-- Bedrock with default model `nvidia.nemotron-super-3-120b` in `us-east-1`
+- Bedrock with default model `us.anthropic.claude-haiku-4-5-20251001-v1:0` in `us-east-1`
 - Bedrock model discovery enabled by default
 - SSM `SecureString` parameters for secrets and SOUL.md
 - Secret injection via systemd wrapper (secrets in process env, not on disk)

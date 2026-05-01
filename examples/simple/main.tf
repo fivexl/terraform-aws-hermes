@@ -7,7 +7,7 @@ module "hermes" {
 
   hermes_version = "v2026.4.30"
 
-  # Bedrock defaults: us-east-1, nvidia.nemotron-super-3-120b
+  # Bedrock defaults: us-east-1, us.anthropic.claude-haiku-4-5-20251001-v1:0
   # Network defaults: auto-discovers default VPC/subnet
   # Storage defaults: 20 GiB gp3 persistent volume at /var/lib/hermes
 
