@@ -10,7 +10,7 @@ This Terraform module deploys Hermes on a single AWS EC2 instance with:
 
 - **Docker Compose** running the Hermes gateway and dashboard as containers
 - **Amazon Bedrock** as the model backend (no API keys to manage, uses IAM)
-- **Slack Socket Mode** as the messaging channel (no inbound webhooks required)
+- **Messaging without public ingress for adapters**: optional **Slack Socket Mode** (no Slack webhook URLs) and/or **email over IMAP/SMTP** (polling and outbound SMTP from the instance—see [`variables.tf`](../variables.tf) `slack_enabled`, `email_enabled`)
 - **SSM Session Manager** as the only administrative access path
 - **Persistent EBS volume** for Hermes state that survives instance replacement
 
@@ -28,7 +28,7 @@ Hermes maintains local state (agent workspaces, sessions, memories, skills). Run
 
 3. **ASG for recovery**: The Auto Scaling Group (desired=1, min=1, max=1) provides automatic instance replacement if the instance becomes unhealthy. It is not used for horizontal scaling.
 
-4. **Weekly refresh**: An EventBridge Scheduler triggers an ASG instance refresh weekly. This rebuilds the instance with the latest AMI and fresh configuration, preventing drift.
+4. **Weekly refresh**: An EventBridge Scheduler triggers an ASG instance refresh weekly. This rebuilds the instance with the latest AMI and fresh configuration, preventing drift. With email enabled, upstream Hermes typically **marks existing mailbox messages as seen** on gateway startup and then continues polling—so scheduled replacements should not re-process historical mail as “new,” aside from ordinary boot downtime.
 
 ## Deployment Model
 
@@ -38,7 +38,7 @@ Hermes runs as two Docker containers managed by Docker Compose with `network_mod
 
 | Container | Command | Purpose |
 |-----------|---------|---------|
-| `hermes-gateway` | `gateway run` | Messaging gateway (Slack Socket Mode, Bedrock inference) |
+| `hermes-gateway` | `gateway run` | Messaging gateway (optional Slack / email per Terraform), Bedrock inference |
 | `hermes-dashboard` | `dashboard --host 127.0.0.1 --no-open` | Web management UI (localhost-only) |
 
 Both containers share the same persistent data volume mounted at `/opt/data` inside the container (host path: `/var/lib/hermes`). The Docker Compose file and related configuration live at `/opt/hermes/` on the host. The Docker `--restart unless-stopped` policy handles container failures.
@@ -58,9 +58,11 @@ Hermes does not natively support AWS SSM Parameter Store. Secrets are injected t
 5. Secrets live only in process memory, never written to disk
 
 This keeps live secret material out of:
-- Terraform state (Slack tokens use `lifecycle { ignore_changes = [value] }`)
+- Terraform state (Slack tokens and email password use `lifecycle { ignore_changes = [value] }`)
 - Files on any filesystem (root or persistent volume)
 - Container images
+
+Non-sensitive email settings (address, hosts, ports, allowlists, etc.) are rendered into `docker-compose.yml` from Terraform; only **`EMAIL_PASSWORD`** is fetched from SSM at startup.
 
 ### UID/GID Handling
 
@@ -82,6 +84,8 @@ Outbound traffic is restricted to:
 |------|----------|---------|
 | 443  | TCP      | HTTPS (AWS APIs, Slack WebSocket, Docker Hub) |
 | 53   | UDP/TCP  | DNS resolution |
+| `email_imap_port` (default 993) | TCP | IMAP when `email_enabled` |
+| `email_smtp_port` (default 587) | TCP | SMTP when `email_enabled` |
 
 ### No SSH
 
@@ -101,17 +105,22 @@ The module uses Amazon Bedrock for model inference. This means:
 - Model discovery is enabled by default (configurable), allowing Hermes to auto-detect available models at runtime
 - A default model is configured for initial use
 
-## Slack Socket Mode
+## Messaging: Slack (`slack_enabled`)
 
-Slack integration uses Socket Mode exclusively:
+When enabled (default), Slack uses Socket Mode exclusively:
 
-- The bot maintains a persistent WebSocket connection to Slack
-- No inbound HTTP endpoint is needed
-- No Slack signing secret is required
-- Two tokens are needed: a Bot Token (xoxb-) and an App Token (xapp-)
-- Tokens are stored as SSM SecureString parameters and injected as environment variables at runtime
-- `SLACK_HOME_CHANNEL` is configurable for cron job delivery
-- `SLACK_ALLOWED_USERS` can restrict access to specific Slack user IDs (defaults to all users)
+- Persistent WebSocket to Slack—**no inbound HTTP** endpoint for Slack on your side
+- Bot Token (xoxb-) and App Token (xapp-) in SSM; injected at container start
+- `SLACK_HOME_CHANNEL`, `SLACK_ALLOWED_USERS`, and workspace-wide `GATEWAY_ALLOW_ALL_USERS` behavior follow Terraform variables (see `variables.tf`)
+
+When `slack_enabled = false`, the module **does not** create Slack SSM parameters or pass Slack-related environment variables—useful for **email-only** deployments.
+
+## Messaging: Email (`email_enabled`)
+
+When enabled, Hermes uses provider **IMAP** and **SMTP** with credentials and tuning from Terraform plus **`EMAIL_PASSWORD`** from SSM (`<prefix>/email/password`). There is **no** listener or inbound URL for email—the instance polls outbound.
+
+- Optional `platforms.email.skip_attachments` is rendered into `config.yaml` when `email_skip_attachments` is true
+- Empty `email_allowed_users` does **not** set `EMAIL_ALLOW_ALL_USERS`; use `email_allow_all_users` only with deliberate risk acceptance
 
 ## Secret Management
 
@@ -119,16 +128,17 @@ Slack integration uses Socket Mode exclusively:
 
 | Path | Purpose | Created By |
 |------|---------|-----------|
-| `<prefix>/slack/bot_token` | Slack Bot Token | This module (Terraform); **value** set by operator |
-| `<prefix>/slack/app_token` | Slack App Token | This module (Terraform); **value** set by operator |
-| `<prefix>/soul_md` | Agent personality (SOUL.md) | This module (Terraform); **value** set by operator |
-| `<prefix>/api_server_key` | API server bearer token (when enabled) | This module (Terraform); auto-generated |
+| `<prefix>/slack/bot_token` | Slack Bot Token | When `slack_enabled`; **value** set by operator |
+| `<prefix>/slack/app_token` | Slack App Token | When `slack_enabled`; **value** set by operator |
+| `<prefix>/email/password` | Email app password (`EMAIL_PASSWORD`) | When `email_enabled`; **value** set by operator |
+| `<prefix>/soul_md` | Agent personality (SOUL.md) | Always; **value** set by operator |
+| `<prefix>/api_server_key` | API server bearer token (when enabled) | Auto-generated |
 
 ### External Secret Ownership
 
-The module creates SSM `SecureString` parameters for Slack tokens and SOUL.md so paths and IAM stay aligned with Terraform.
+The module creates SSM `SecureString` parameters for secrets used at boot (Slack tokens when enabled, email password when enabled, SOUL.md always) so paths and IAM stay aligned with Terraform.
 
-Initial parameter values are placeholders; Terraform ignores changes to `value` after creation so operators set and rotate real values with the AWS CLI or console (`put-parameter --overwrite`) without Terraform fighting those updates. The API server key (when enabled) is generated by Terraform via `random_password`.
+Initial parameter values are placeholders where applicable; Terraform ignores changes to `value` after creation so operators set and rotate real values with the AWS CLI or console (`put-parameter --overwrite`) without Terraform fighting those updates. The API server key (when enabled) is generated by Terraform via `random_password`.
 
 ## Dashboard and API Server
 
@@ -196,7 +206,7 @@ Bootstrap and EBS attachment logs are captured via journald on the instance (`jo
 - Custom VPC creation
 - SSH access
 - Multi-instance / HA deployment
-- Additional messaging channels beyond Slack
+- Messaging channels beyond **Slack and email** supported here (Discord, Telegram, etc. remain bring-your-own outside this module)
 - Generic config override escape hatches
 - Snapshot automation / backup scheduling
 - Customer-managed KMS keys (uses AWS-managed EBS key)

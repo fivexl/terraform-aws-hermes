@@ -129,8 +129,13 @@ done
 echo ""
 
 echo "=== SSM parameters (metadata only; token values never shown) ==="
+%{ if slack_enabled ~}
 ssm_param_exists "${ssm_slack_bot_token_path}"
 ssm_param_exists "${ssm_slack_app_token_path}"
+%{ endif ~}
+%{ if email_enabled ~}
+ssm_param_exists "${ssm_email_password_path}"
+%{ endif ~}
 ssm_param_exists "${ssm_soul_md_path}"
 %{ if api_server_enabled ~}
 ssm_param_exists "${ssm_api_server_key_path}"

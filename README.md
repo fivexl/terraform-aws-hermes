@@ -15,7 +15,7 @@
 
 Terraform module to deploy [Hermes](https://github.com/nousresearch/hermes-agent) on AWS EC2 using immutable infrastructure principles.
 
-Hermes is an open-source, self-improving AI agent by NousResearch that supports 30+ LLM providers and multiple messaging platforms. This module deploys it as a single-node Docker Compose service backed by Amazon Bedrock for inference and Slack Socket Mode for messaging.
+Hermes is an open-source, self-improving AI agent by NousResearch that supports 30+ LLM providers and multiple messaging platforms. This module deploys it as a single-node Docker Compose service backed by Amazon Bedrock for inference and **optional messaging channels that do not require exposing HTTP endpoints or public URLs**—typically **Slack Socket Mode** (WebSocket out) and/or **email** (IMAP/SMTP out). Enable each channel with Terraform flags (`slack_enabled`, `email_enabled`).
 
 ## Architecture
 
@@ -30,10 +30,15 @@ Hermes is an open-source, self-improving AI agent by NousResearch that supports 
 ## Prerequisites
 
 - AWS account with a default VPC (or provide a `subnet_id`)
-- Slack App with Socket Mode enabled ([setup guide](docs/runbook.md#2-create-slack-app))
-- After `terraform apply`, set real values on the module-created SSM parameters:
-  - Slack tokens: `<prefix>/slack/bot_token` and `<prefix>/slack/app_token` ([instructions](docs/runbook.md#4-set-slack-token-values))
-  - Agent personality: `<prefix>/soul_md` ([instructions](docs/runbook.md#5-set-soul_md))
+- **At least one messaging channel** (`slack_enabled` and/or `email_enabled`; defaults keep Slack on and email off)
+- If **`slack_enabled`** (default): Slack App with Socket Mode enabled ([runbook](docs/runbook.md#3-slack-app-when-slack_enabled--true))
+- If **`email_enabled`**: dedicated mailbox, IMAP/SMTP reachability, app password stored in SSM ([runbook](docs/runbook.md#4-email-mailbox-when-email_enabled--true), [Hermes email docs](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/email))
+- After `terraform apply`, set real values on SSM parameters the module creates (placeholders until you overwrite):
+  - Slack (`slack_enabled`): `<prefix>/slack/bot_token`, `<prefix>/slack/app_token`
+  - Email (`email_enabled`): `<prefix>/email/password`
+  - Always: `<prefix>/soul_md`
+  - Optional API: `<prefix>/api_server_key` when `api_server_enabled`
+  See [Operator Runbook](docs/runbook.md) for exact steps.
 - Bedrock model access enabled in your account for the configured model
 
 ## Usage

@@ -34,23 +34,23 @@ output "data_volume_id" {
 }
 
 output "slack_bot_token_ssm_parameter_name" {
-  description = "SSM parameter name for the Slack bot token. Value is set outside Terraform."
-  value       = aws_ssm_parameter.slack_bot_token.name
+  description = "SSM parameter name for the Slack bot token when slack_enabled is true. Null when Slack is disabled."
+  value       = var.slack_enabled ? aws_ssm_parameter.slack_bot_token[0].name : null
 }
 
 output "slack_bot_token_ssm_parameter_arn" {
-  description = "SSM parameter ARN for the Slack bot token."
-  value       = aws_ssm_parameter.slack_bot_token.arn
+  description = "SSM parameter ARN for the Slack bot token when slack_enabled is true. Null when Slack is disabled."
+  value       = var.slack_enabled ? aws_ssm_parameter.slack_bot_token[0].arn : null
 }
 
 output "slack_app_token_ssm_parameter_name" {
-  description = "SSM parameter name for the Slack app token. Value is set outside Terraform."
-  value       = aws_ssm_parameter.slack_app_token.name
+  description = "SSM parameter name for the Slack app token when slack_enabled is true. Null when Slack is disabled."
+  value       = var.slack_enabled ? aws_ssm_parameter.slack_app_token[0].name : null
 }
 
 output "slack_app_token_ssm_parameter_arn" {
-  description = "SSM parameter ARN for the Slack app token."
-  value       = aws_ssm_parameter.slack_app_token.arn
+  description = "SSM parameter ARN for the Slack app token when slack_enabled is true. Null when Slack is disabled."
+  value       = var.slack_enabled ? aws_ssm_parameter.slack_app_token[0].arn : null
 }
 
 output "soul_md_ssm_parameter_name" {

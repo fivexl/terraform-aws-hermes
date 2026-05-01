@@ -11,7 +11,13 @@ Before deploying, enable access to the Bedrock model(s) you plan to use:
 3. Request access to the configured model (default: `nvidia.nemotron-super-3-120b`)
 4. Wait for access to be granted (usually immediate for most models)
 
-### 2. Create Slack App
+### 2. Choose Messaging Channels
+
+The module requires **at least one** channel: Slack (`slack_enabled`, default `true`) and/or email (`email_enabled`, default `false`). Both use **outbound-only** patterns—no inbound HTTP endpoints or public URLs for the messaging adapters (Slack Socket Mode; email via IMAP/SMTP from the instance).
+
+### 3. Slack App (when `slack_enabled = true`)
+
+Skip this section if you deploy **email-only** (`slack_enabled = false`, `email_enabled = true`).
 
 1. Go to [Slack API Apps](https://api.slack.com/apps) and click **Create New App**
 2. Choose **From scratch**, name it (e.g., "Hermes"), and select your workspace
@@ -26,33 +32,49 @@ Before deploying, enable access to the Bedrock model(s) you plan to use:
 6. Install the app to your workspace
 7. Copy the **Bot User OAuth Token** (xoxb-...) from the OAuth page
 
-### 3. Deploy
+### 4. Email Mailbox (when `email_enabled = true`)
+
+Hermes talks to your provider over **IMAP** (inbound) and **SMTP** (outbound). Use a **dedicated** mailbox for the agent (not your personal inbox). Typical steps:
+
+1. Create or designate an email account for Hermes only.
+2. Enable **IMAP** (and SMTP sending) per provider documentation.
+3. If the provider uses 2FA (e.g. Gmail), create an **app password**—that value becomes `EMAIL_PASSWORD` in SSM, not your normal login password.
+4. Decide **allowed senders** (`email_allowed_users` in Terraform). An empty list keeps Hermes default behavior (pairing codes); it does **not** set open-by-default email. To allow **any** sender, set `email_allow_all_users = true` only with deliberate risk acceptance (see variable description).
+5. Set Terraform variables: `email_address`, `email_imap_host`, `email_smtp_host`, optional `email_imap_port` / `email_smtp_port` (defaults 993 / 587), `email_poll_interval`, optional `email_home_address`, `email_skip_attachments`, etc.
+
+Authoritative upstream behavior and provider examples: [Hermes Email setup](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/email).
+
+**Security group:** When `email_enabled`, the module opens outbound TCP on `email_imap_port` and `email_smtp_port` to `0.0.0.0/0`. If you override ports in Terraform, egress matches those values.
+
+### 5. Deploy
 
 ```bash
 terraform init
 terraform apply
 ```
 
-Terraform creates all SSM parameters:
+Terraform creates SSM parameters as follows (default prefix `/hermes`; adjust if `ssm_parameter_prefix` differs):
 
-- **Slack tokens** -- parameters exist at `<prefix>/slack/bot_token` and `<prefix>/slack/app_token` with placeholder values. You **must** overwrite them with real tokens before Hermes can talk to Slack (next section).
-- **SOUL.md** -- parameter exists at `<prefix>/soul_md` with a placeholder value. Set it to define the agent's personality.
-- **API server key** (when `api_server_enabled = true`) -- auto-generated at `<prefix>/api_server_key`.
+| Parameter path | When | Initial value |
+|----------------|------|----------------|
+| `<prefix>/slack/bot_token` | `slack_enabled` | Placeholder; **overwrite** before relying on Slack |
+| `<prefix>/slack/app_token` | `slack_enabled` | Placeholder; **overwrite** before relying on Slack |
+| `<prefix>/email/password` | `email_enabled` | Placeholder; **overwrite** with app password |
+| `<prefix>/soul_md` | Always | Placeholder; set personality |
+| `<prefix>/api_server_key` | `api_server_enabled` | Auto-generated |
 
-Default prefix is `/hermes`.
-
-If you already created those SSM parameters by hand before this behavior existed, import them instead of failing on "already exists":
+If parameters already existed before Terraform managed them, import using the **indexed** addresses (Slack resources use `count`):
 
 ```bash
-terraform import 'aws_ssm_parameter.slack_bot_token' '/hermes/slack/bot_token'
-terraform import 'aws_ssm_parameter.slack_app_token' '/hermes/slack/app_token'
+terraform import 'aws_ssm_parameter.slack_bot_token[0]' '/hermes/slack/bot_token'
+terraform import 'aws_ssm_parameter.slack_app_token[0]' '/hermes/slack/app_token'
 ```
 
 Use your actual parameter names if `ssm_parameter_prefix` is not `/hermes`.
 
-### 4. Set Slack Token Values
+### 6. Set Slack Token Values (`slack_enabled = true`)
 
-Overwrite the placeholders with the tokens from step 2. Use Terraform outputs so the names stay correct if you change `ssm_parameter_prefix`:
+When Slack is disabled, Terraform outputs for Slack parameters are `null`—use the known paths under `ssm_parameter_prefix` if you ever re-enable Slack manually.
 
 ```bash
 BOT_PARAM="$(terraform output -raw slack_bot_token_ssm_parameter_name)"
@@ -73,7 +95,25 @@ aws ssm put-parameter \
 
 If the instance already started with placeholders, restart Hermes after updating tokens (see [Updating Slack Tokens](#updating-slack-tokens)).
 
-### 5. Set SOUL.md
+### 7. Set Email Password (`email_enabled = true`)
+
+There is **no** Terraform output for the email password parameter name (by design). Use:
+
+`<ssm_parameter_prefix>/email/password`
+
+Example with default prefix:
+
+```bash
+aws ssm put-parameter \
+  --name "/hermes/email/password" \
+  --type SecureString \
+  --value "your-app-password-here" \
+  --overwrite
+```
+
+Use spaces or hex format exactly as your provider issued it. Restart Hermes after changing (see [Updating Email Password](#updating-email-password)).
+
+### 8. Set SOUL.md
 
 The SOUL.md file defines the agent's personality and system prompt. Set it via SSM:
 
@@ -170,8 +210,9 @@ An EventBridge Scheduler triggers an ASG instance refresh weekly (default: Sunda
 
 - Brief downtime (a few minutes) while the new instance boots, pulls the Docker image, and starts Hermes
 - All Hermes state (sessions, memories, skills) is preserved on the EBS volume
-- Slack connection reconnects automatically after the new instance starts
-- No operator intervention needed
+- **Slack:** With `slack_enabled`, the Socket Mode connection reconnects automatically after the new instance starts
+- **Email:** After restart, the Hermes email adapter typically **re-tests IMAP/SMTP**, marks **existing inbox messages as seen**, then polls for **new** mail only—so you should not see duplicate processing of old messages across refreshes; there is still a short gap while the new instance boots
+- No operator intervention needed for normal refreshes
 
 ### Triggering a Manual Refresh
 
@@ -188,10 +229,22 @@ aws autoscaling start-instance-refresh \
 
 1. Check bootstrap logs via SSM session: `journalctl -t hermes-bootstrap`. If SSM is not yet available (instance still booting), check the **EC2 system log** in the AWS console (Actions > Monitor and troubleshoot > Get system log).
 2. Common issues:
-   - **Slack still using placeholders**: Ensure you ran `put-parameter --overwrite` for both Slack parameters with real `xoxb-` / `xapp-` tokens, then restart the containers
+   - **Slack placeholders** (`slack_enabled`): Ensure you ran `put-parameter --overwrite` for both Slack parameters with real `xoxb-` / `xapp-` tokens, then restart the containers
+   - **Email password placeholder** (`email_enabled`): Set `<prefix>/email/password` and restart; verify IMAP/SMTP hosts and ports in Terraform match the provider
+   - **Email blocked by security group**: Confirm `email_enabled` is true and outbound rules include your `email_imap_port` / `email_smtp_port`; misconfigured ports in Terraform cause mismatched SG vs Hermes
    - **Bedrock access not enabled**: Check model access in the Bedrock console
    - **EBS volume stuck in `in-use`**: Previous instance may not have fully terminated; the script waits up to 5 minutes then fails safely
    - **Docker image pull failed**: Check network connectivity and that the image tag exists
+
+### Email-Specific Issues
+
+| Symptom | Things to check |
+|---------|------------------|
+| IMAP/SMTP errors at startup | Hosts, ports, TLS expectations (993/587 defaults), app password, IMAP enabled at provider |
+| No replies received | `email_allowed_users` includes sender; spam folder; only one gateway instance running |
+| Authentication failures | App password vs normal password (Gmail requires app password + 2FA) |
+
+See upstream [Email troubleshooting](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/email#troubleshooting).
 
 ### EBS Volume Won't Attach
 
@@ -227,6 +280,9 @@ cat /opt/hermes/docker-compose.yml
 
 # Verify the image was pulled
 docker images | grep hermes-agent
+
+# Optional one-shot diagnostics (SSM presence only; never prints secrets)
+sudo /opt/hermes/hermes-diagnose.sh
 ```
 
 ### Updating Hermes Version
@@ -238,7 +294,7 @@ docker images | grep hermes-agent
 
 ## Updating Slack Tokens
 
-Slack parameter **names** are managed by Terraform; **values** are always updated outside Terraform (Terraform ignores `value` changes on those resources).
+Only applies when `slack_enabled = true`. Parameter **names** are managed by Terraform; **values** are updated outside Terraform (`lifecycle.ignore_changes` on values).
 
 ```bash
 BOT_PARAM="$(terraform output -raw slack_bot_token_ssm_parameter_name)"
@@ -265,6 +321,20 @@ cd /opt/hermes
 docker compose restart
 ```
 
+## Updating Email Password
+
+When `email_enabled = true`, update `<prefix>/email/password` (default `/hermes/email/password`):
+
+```bash
+aws ssm put-parameter \
+  --name "/hermes/email/password" \
+  --type SecureString \
+  --value "new-app-password" \
+  --overwrite
+```
+
+Then restart Hermes (same as Slack—`docker compose restart` from `/opt/hermes` via SSM, or trigger an instance refresh).
+
 ## Updating SOUL.md
 
 ```bash
@@ -286,3 +356,14 @@ docker compose restart
 ```
 
 Or trigger an instance refresh to pick it up on next boot.
+
+## Upgrading: Slack SSM Resources Now Use `count`
+
+If you deployed this module **before** Slack parameters used Terraform `count`, move state so existing AWS parameters map to the new addresses:
+
+```bash
+terraform state mv 'aws_ssm_parameter.slack_bot_token' 'aws_ssm_parameter.slack_bot_token[0]'
+terraform state mv 'aws_ssm_parameter.slack_app_token' 'aws_ssm_parameter.slack_app_token[0]'
+```
+
+Then run `terraform plan`—there should be no unintended destruction of those parameters.

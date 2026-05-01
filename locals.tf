@@ -13,16 +13,20 @@ locals {
   # SSM parameter paths
   ssm_slack_bot_token_path = "${var.ssm_parameter_prefix}/slack/bot_token"
   ssm_slack_app_token_path = "${var.ssm_parameter_prefix}/slack/app_token"
+  ssm_email_password_path  = "${var.ssm_parameter_prefix}/email/password"
   ssm_soul_md_path         = "${var.ssm_parameter_prefix}/soul_md"
   ssm_api_server_key_path  = "${var.ssm_parameter_prefix}/api_server_key"
 
   ssm_parameter_arns = concat(
+    var.slack_enabled ? [
+      aws_ssm_parameter.slack_bot_token[0].arn,
+      aws_ssm_parameter.slack_app_token[0].arn,
+    ] : [],
     [
-      aws_ssm_parameter.slack_bot_token.arn,
-      aws_ssm_parameter.slack_app_token.arn,
       aws_ssm_parameter.soul_md.arn,
     ],
-    var.api_server_enabled ? [aws_ssm_parameter.api_server_key[0].arn] : []
+    var.api_server_enabled ? [aws_ssm_parameter.api_server_key[0].arn] : [],
+    var.email_enabled ? [aws_ssm_parameter.email_password[0].arn] : [],
   )
 
   # CloudWatch
@@ -48,20 +52,38 @@ locals {
     bedrock_region            = var.bedrock_region
     bedrock_model_id          = var.bedrock_model_id
     bedrock_discovery_enabled = var.bedrock_discovery_enabled
+    email_enabled             = var.email_enabled
+    email_skip_attachments    = var.email_skip_attachments
   })
 
   hermes_compose = templatefile("${path.module}/templates/docker-compose.yml.tpl", {
-    image              = local.hermes_image
-    data_path          = var.data_path
-    log_group_name     = local.log_group_name
-    region             = local.region
-    api_server_enabled = var.api_server_enabled
+    image                   = local.hermes_image
+    data_path               = var.data_path
+    log_group_name          = local.log_group_name
+    region                  = local.region
+    api_server_enabled      = var.api_server_enabled
+    slack_enabled           = var.slack_enabled
+    email_enabled           = var.email_enabled
+    email_address           = var.email_address
+    email_imap_host         = var.email_imap_host
+    email_smtp_host         = var.email_smtp_host
+    email_imap_port         = var.email_imap_port
+    email_smtp_port         = var.email_smtp_port
+    email_poll_interval     = var.email_poll_interval
+    email_allowed_users_csv = join(",", var.email_allowed_users)
+    email_allowed_users_set = length(var.email_allowed_users) > 0
+    email_home_address      = var.email_home_address
+    email_home_address_set  = length(trimspace(var.email_home_address)) > 0
+    email_allow_all_users   = var.email_allow_all_users
   })
 
   hermes_start_script = templatefile("${path.module}/templates/hermes-start.sh.tpl", {
     region                        = local.region
+    slack_enabled                 = var.slack_enabled
+    email_enabled                 = var.email_enabled
     ssm_slack_bot_token_path      = local.ssm_slack_bot_token_path
     ssm_slack_app_token_path      = local.ssm_slack_app_token_path
+    ssm_email_password_path       = local.ssm_email_password_path
     ssm_soul_md_path              = local.ssm_soul_md_path
     ssm_api_server_key_path       = local.ssm_api_server_key_path
     data_path                     = var.data_path
@@ -81,8 +103,11 @@ locals {
     region                   = local.region
     data_path                = var.data_path
     compose_dir              = local.compose_dir
+    slack_enabled            = var.slack_enabled
+    email_enabled            = var.email_enabled
     ssm_slack_bot_token_path = local.ssm_slack_bot_token_path
     ssm_slack_app_token_path = local.ssm_slack_app_token_path
+    ssm_email_password_path  = local.ssm_email_password_path
     ssm_soul_md_path         = local.ssm_soul_md_path
     ssm_api_server_key_path  = local.ssm_api_server_key_path
     api_server_enabled       = var.api_server_enabled

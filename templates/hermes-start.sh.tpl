@@ -55,12 +55,12 @@ printf '%s' "$SOUL_MD" > "$DATA_PATH/SOUL.md"
 chown "$HERMES_UID:$HERMES_GID" "$DATA_PATH/SOUL.md"
 unset SOUL_MD
 
-# Fetch secrets and export to environment for docker compose interpolation.
+%{ if slack_enabled ~}
+# Fetch Slack secrets and export for docker compose interpolation.
 SLACK_BOT_TOKEN=$(ssm_get "${ssm_slack_bot_token_path}")
 SLACK_APP_TOKEN=$(ssm_get "${ssm_slack_app_token_path}")
 export SLACK_BOT_TOKEN SLACK_APP_TOKEN
 
-# Pass-through Slack tuning (may be empty, which is fine).
 export SLACK_HOME_CHANNEL="${slack_home_channel}"
 export SLACK_ALLOWED_USERS="${slack_allowed_users}"
 
@@ -68,6 +68,12 @@ export SLACK_ALLOWED_USERS="${slack_allowed_users}"
 export GATEWAY_ALLOW_ALL_USERS=true
 %{ else ~}
 export GATEWAY_ALLOW_ALL_USERS=false
+%{ endif ~}
+%{ endif ~}
+
+%{ if email_enabled ~}
+EMAIL_PASSWORD=$(ssm_get "${ssm_email_password_path}")
+export EMAIL_PASSWORD
 %{ endif ~}
 
 %{ if api_server_enabled ~}
