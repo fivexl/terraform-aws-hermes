@@ -10,6 +10,20 @@ locals {
     HermesDeployment = var.name
   })
 
+  # Email egress rules use for_each keys imap/smtp (see security_group.tf) — stable addresses vs module count indices.
+  email_egress_rules = var.email_enabled ? {
+    imap = {
+      from_port   = var.email_imap_port
+      to_port     = var.email_imap_port
+      description = "IMAP (Hermes email)"
+    }
+    smtp = {
+      from_port   = var.email_smtp_port
+      to_port     = var.email_smtp_port
+      description = "SMTP (Hermes email)"
+    }
+  } : {}
+
   # SSM parameter paths
   ssm_slack_bot_token_path = "${var.ssm_parameter_prefix}/slack/bot_token"
   ssm_slack_app_token_path = "${var.ssm_parameter_prefix}/slack/app_token"

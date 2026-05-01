@@ -72,9 +72,11 @@ terraform import 'aws_ssm_parameter.slack_app_token[0]' '/hermes/slack/app_token
 
 Use your actual parameter names if `ssm_parameter_prefix` is not `/hermes`.
 
+**Terraform state migration (Slack `count`):** If you already had live infrastructure from a version where Slack SSM resources had no `count` index, use `terraform state mv` so addresses match the current module—see [Upgrading: Slack SSM Resources Now Use `count`](#upgrading-slack-ssm-resources-now-use-count). That is different from `terraform import` (for hand-created parameters in a fresh state).
+
 ### 6. Set Slack Token Values (`slack_enabled = true`)
 
-When Slack is disabled, Terraform outputs for Slack parameters are `null`—use the known paths under `ssm_parameter_prefix` if you ever re-enable Slack manually.
+When Slack is disabled, Terraform outputs for Slack parameters are `null`—use the known paths under `ssm_parameter_prefix` if you ever re-enable Slack manually. With `slack_enabled = true`, `terraform output -raw` is fine; if an output is `null`, `-raw` may print an empty line or the literal `null` depending on CLI version—prefer the explicit `/slack/bot_token` paths when automating across both modes.
 
 ```bash
 BOT_PARAM="$(terraform output -raw slack_bot_token_ssm_parameter_name)"
@@ -358,6 +360,8 @@ docker compose restart
 Or trigger an instance refresh to pick it up on next boot.
 
 ## Upgrading: Slack SSM Resources Now Use `count`
+
+This section is the **Terraform state migration** path for Slack parameters after the module started using `count` on those resources. It is **not** the same as `terraform import` for operator-created parameters (see **§ 5. Deploy** above).
 
 If you deployed this module **before** Slack parameters used Terraform `count`, move state so existing AWS parameters map to the new addresses:
 
