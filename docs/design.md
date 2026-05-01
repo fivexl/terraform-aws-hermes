@@ -87,6 +87,8 @@ Outbound traffic is restricted to:
 | `email_imap_port` (default 993) | TCP | IMAP when `email_enabled` |
 | `email_smtp_port` (default 587) | TCP | SMTP when `email_enabled` |
 
+Implementation uses **`aws_vpc_security_group_egress_rule`** with **`for_each`** and stable keys (`https`, `dns_udp`, `dns_tcp`, plus `imap` / `smtp` when email is enabled). The security-group module creates only the empty SG; it does not attach count-based egress rules for these ports.
+
 ### No SSH
 
 There is no SSH key pair and no SSH ingress rule. All administrative access goes through AWS Systems Manager Session Manager, which provides:
@@ -175,6 +177,14 @@ On every boot, the user data script:
 ### Why Not Terraform Volume Attachment?
 
 The ASG replaces instances with new instance IDs. Terraform's `aws_volume_attachment` would need to reference a specific instance ID, which changes on every replacement. Instead, the boot script handles attachment dynamically using tag-based discovery.
+
+## Terraform Conventions
+
+**Prefer `for_each` over `count`** when declaring several instances of the same resource type. Use a map with **stable, meaningful keys** (for example `https`, `dns_udp`, `imap`) so that adding, removing, or toggling one item does not reindex the rest and force unrelated replacements. This is the default approach in HashiCorp’s documentation for non-sequential resource sets.
+
+Use **`count`** only when it is a better fit, for example a single optional resource (`count = var.enabled ? 1 : 0`) or when a **third-party module** only exposes list/`count` semantics and wrapping it would not improve address stability.
+
+In this module, **security group egress** is implemented with `for_each` on `aws_vpc_security_group_egress_rule` (see [Egress restrictions](#egress-restrictions)); optional **Slack SSM parameters** use `count` because each is a single optional singleton.
 
 ## IAM Permissions
 

@@ -14,34 +14,18 @@ module "sg" {
   # Previous implementation was IPv4-only (no ::/0 rules).
   egress_ipv6_cidr_blocks = []
 
-  # Email egress is managed below with for_each (stable keys imap/smtp) so toggling email
-  # does not renumber the module's internal count-based rules for HTTPS/DNS.
-  egress_with_cidr_blocks = [
-    {
-      rule        = "https-443-tcp"
-      cidr_blocks = "0.0.0.0/0"
-      description = "HTTPS outbound"
-    },
-    {
-      rule        = "dns-udp"
-      cidr_blocks = "0.0.0.0/0"
-      description = "DNS UDP outbound"
-    },
-    {
-      rule        = "dns-tcp"
-      cidr_blocks = "0.0.0.0/0"
-      description = "DNS TCP outbound"
-    },
-  ]
+  # Egress rules are attached separately (aws_vpc_security_group_egress_rule) with for_each and
+  # stable keys (https, dns_udp, dns_tcp, imap, smtp) instead of the module's count-based rules.
+  egress_with_cidr_blocks = []
 }
 
-resource "aws_vpc_security_group_egress_rule" "email" {
-  for_each = local.email_egress_rules
+resource "aws_vpc_security_group_egress_rule" "egress" {
+  for_each = local.sg_egress_rules
 
   security_group_id = module.sg.security_group_id
   description       = each.value.description
   cidr_ipv4         = "0.0.0.0/0"
-  ip_protocol       = "tcp"
+  ip_protocol       = each.value.ip_protocol
   from_port         = each.value.from_port
   to_port           = each.value.to_port
 }

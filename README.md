@@ -75,7 +75,7 @@ aws ssm start-session \
 
 ## Documentation
 
-- [Architecture & Design](docs/design.md) -- why the system is shaped this way
+- [Architecture & Design](docs/design.md) -- why the system is shaped this way (includes Terraform conventions: prefer `for_each` over `count` where applicable)
 - [Operator Runbook](docs/runbook.md) -- day-to-day operations, troubleshooting, secret setup
 
 <!-- BEGIN_TF_DOCS -->
