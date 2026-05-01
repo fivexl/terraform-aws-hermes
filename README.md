@@ -1,3 +1,16 @@
+[![FivexL](https://releases.fivexl.io/like-this-repo-banner.png)](https://fivexl.io/#email-subscription)
+
+### Want practical AWS infrastructure insights?
+
+👉 [Subscribe to our newsletter](https://fivexl.io/#email-subscription) to get:
+
+- Real stories from real AWS projects  
+- No-nonsense DevOps tactics  
+- Cost, security & compliance patterns that actually work  
+- Expert guidance from engineers in the field
+
+=========================================================================
+
 # terraform-aws-hermes
 
 Terraform module to deploy [Hermes](https://github.com/nousresearch/hermes-agent) on AWS EC2 using immutable infrastructure principles.
