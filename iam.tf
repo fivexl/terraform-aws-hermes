@@ -44,7 +44,15 @@ data "aws_iam_policy_document" "bedrock" {
       "bedrock:InvokeModel",
       "bedrock:InvokeModelWithResponseStream",
     ]
-    resources = [local.bedrock_model_arn]
+    resources = local.bedrock_invoke_resource_arns
+  }
+
+  statement {
+    sid = "ReadInferenceProfiles"
+    actions = [
+      "bedrock:GetInferenceProfile",
+    ]
+    resources = local.bedrock_inference_profile_read_arns
   }
 
   dynamic "statement" {

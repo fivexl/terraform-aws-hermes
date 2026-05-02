@@ -80,6 +80,30 @@ locals {
     : "arn:aws:bedrock:${var.bedrock_region}::foundation-model/${var.bedrock_model_id}"
   )
 
+  # Regional inference profile IDs map to a foundation model ID without the xx. prefix (see AWS inference profile IAM docs).
+  # Inference profile IDs matching /^[a-z]{2}\\./ always use exactly three leading characters (e.g. us.) before the base ID.
+  bedrock_foundation_model_id_for_profile = (
+    can(regex("^[a-z]{2}\\.", var.bedrock_model_id))
+    ? substr(var.bedrock_model_id, 3, length(var.bedrock_model_id) - 3)
+    : ""
+  )
+
+  # InvokeModel on inference profiles requires permission on both the profile ARN and the underlying foundation model ARN.
+  # System inference profiles (e.g. us.anthropic.*) route compute across multiple regions; FM invoke may hit us-east-2 etc.,
+  # so the FM ARN uses a wildcard region. Single-region on-demand models keep bedrock_region only via bedrock_model_arn above.
+  bedrock_invoke_resource_arns = distinct(concat(
+    [local.bedrock_model_arn],
+    local.bedrock_foundation_model_id_for_profile != ""
+    ? ["arn:aws:bedrock:*::foundation-model/${local.bedrock_foundation_model_id_for_profile}"]
+    : [],
+  ))
+
+  # Read inference profile metadata (required for invocation via profiles); scoped to this account and Bedrock region.
+  bedrock_inference_profile_read_arns = [
+    "arn:aws:bedrock:${var.bedrock_region}:${data.aws_caller_identity.current.account_id}:inference-profile/*",
+    "arn:aws:bedrock:${var.bedrock_region}:${data.aws_caller_identity.current.account_id}:application-inference-profile/*",
+  ]
+
   # Container image reference
   hermes_image = "nousresearch/hermes-agent:${var.hermes_version}"
 

@@ -105,7 +105,7 @@ The module uses Amazon Bedrock for model inference. This means:
 - Model access is controlled through IAM, not secret rotation
 - The Bedrock region is configurable
 - Model discovery is enabled by default (configurable), allowing Hermes to auto-detect available models at runtime
-- A default model is configured for initial use (default: Anthropic Claude Haiku 4.5 inference profile `us.anthropic.claude-haiku-4-5-20251001-v1:0`). IAM uses an **inference-profile** ARN for IDs that match a regional prefix (`xx.`, e.g. `us.anthropic...`), and the standard **foundation-model** ARN otherwise.
+- A default model is configured for initial use (default: Anthropic Claude Haiku 4.5 inference profile `us.anthropic.claude-haiku-4-5-20251001-v1:0`). IAM uses an **inference-profile** ARN for IDs that match a regional prefix (`xx.`, e.g. `us.anthropic...`), plus **GetInferenceProfile** on inference profiles in the account, **InvokeModel** on **`arn:aws:bedrock:*::foundation-model/<id>`** (prefix stripped) so routed regions such as **us-east-2** are covered, and the **`bedrock_region`-scoped** **foundation-model** ARN alone when no regional prefix is used.
 
 ## Messaging: Slack (`slack_enabled`)
 
@@ -194,7 +194,8 @@ All permissions follow the principle of least privilege:
 |-------|---------|-------------------|
 | SSM Core | Session Manager | AWS managed policy |
 | SSM Parameters | GetParameter | Exact parameter ARNs |
-| Bedrock | InvokeModel, InvokeModelWithResponseStream | Specific model ARNs |
+| Bedrock | InvokeModel, InvokeModelWithResponseStream | Configured foundation-model and/or inference-profile ARN(s); when using a regional inference profile ID, also `arn:aws:bedrock:*::foundation-model/<underlying-id>` so routed regions (e.g. us-east-2) are allowed |
+| Bedrock | GetInferenceProfile | `inference-profile/*` and `application-inference-profile/*` in this account and `bedrock_region` |
 | Bedrock Discovery | ListFoundationModels, ListInferenceProfiles | All resources (when enabled) |
 | EBS | DescribeVolumes, AttachVolume | Tag condition on AttachVolume |
 | CloudWatch Logs | CreateLogGroup, CreateLogStream, PutLogEvents | Specific log group ARN |
