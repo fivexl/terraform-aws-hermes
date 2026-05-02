@@ -143,7 +143,7 @@ variable "slack_allowed_users" {
 ################################################################################
 
 variable "email_enabled" {
-  description = "Enable Hermes email adapter (IMAP/SMTP). Requires non-empty email_address, email_imap_host, and email_smtp_host when true."
+  description = "Enable Hermes email adapter (IMAP/SMTP). When true, requires non-empty email_address, email_imap_host, email_smtp_host, and email_home_address."
   type        = bool
   default     = false
 }
@@ -221,9 +221,14 @@ variable "email_allowed_users" {
 }
 
 variable "email_home_address" {
-  description = "Default delivery address for cron-style jobs (EMAIL_HOME_ADDRESS). Optional."
+  description = "Default delivery address for cron-style jobs (EMAIL_HOME_ADDRESS). Required when email_enabled is true."
   type        = string
   default     = ""
+
+  validation {
+    condition     = !var.email_enabled || length(trimspace(var.email_home_address)) > 0
+    error_message = "When email_enabled is true, email_home_address must be non-empty."
+  }
 }
 
 variable "email_allow_all_users" {

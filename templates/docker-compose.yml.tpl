@@ -29,9 +29,7 @@ services:
 %{ if email_allowed_users_set ~}
       EMAIL_ALLOWED_USERS: "${email_allowed_users_csv}"
 %{ endif ~}
-%{ if email_home_address_set ~}
       EMAIL_HOME_ADDRESS: "${email_home_address}"
-%{ endif ~}
 %{ if email_allow_all_users ~}
       EMAIL_ALLOW_ALL_USERS: "true"
 %{ endif ~}
@@ -41,6 +39,8 @@ services:
       API_SERVER_KEY: $${API_SERVER_KEY}
 %{ endif ~}
     command: ["gateway", "run"]
+    # Match upstream: browser tools need > default shm (see Hermes Docker docs).
+    shm_size: "1gb"
     logging:
       driver: awslogs
       options:

@@ -40,7 +40,7 @@ Hermes talks to your provider over **IMAP** (inbound) and **SMTP** (outbound). U
 2. Enable **IMAP** (and SMTP sending) per provider documentation.
 3. If the provider uses 2FA (e.g. Gmail), create an **app password**—that value becomes `EMAIL_PASSWORD` in SSM, not your normal login password.
 4. Decide **allowed senders** (`email_allowed_users` in Terraform). An empty list keeps Hermes default behavior (pairing codes); it does **not** set open-by-default email. To allow **any** sender, set `email_allow_all_users = true` only with deliberate risk acceptance (see variable description).
-5. Set Terraform variables: `email_address`, `email_imap_host`, `email_smtp_host`, optional `email_imap_port` / `email_smtp_port` (defaults 993 / 587), `email_poll_interval`, optional `email_home_address`, `email_skip_attachments`, etc.
+5. Set Terraform variables: `email_address`, `email_imap_host`, `email_smtp_host`, `email_home_address`, optional `email_imap_port` / `email_smtp_port` (defaults 993 / 587), `email_poll_interval`, `email_skip_attachments`, etc.
 
 Authoritative upstream behavior and provider examples: [Hermes Email setup](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/email).
 

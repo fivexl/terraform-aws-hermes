@@ -122,6 +122,7 @@ When `slack_enabled = false`, the module **does not** create Slack SSM parameter
 When enabled, Hermes uses provider **IMAP** and **SMTP** with credentials and tuning from Terraform plus **`EMAIL_PASSWORD`** from SSM (`<prefix>/email/password`). There is **no** listener or inbound URL for email—the instance polls outbound.
 
 - When `email_enabled`, a `platforms.email` block is always written to `config.yaml` with `skip_attachments` set from the `email_skip_attachments` variable (`true` or `false`)
+- **`email_home_address`** is **required** when `email_enabled`; it sets **`EMAIL_HOME_ADDRESS`** in Compose—the email analogue of **`SLACK_HOME_CHANNEL`** (default address for cron-style job delivery).
 - Empty `email_allowed_users` does **not** set `EMAIL_ALLOW_ALL_USERS`; use `email_allow_all_users` only with deliberate risk acceptance
 
 ## Secret Management

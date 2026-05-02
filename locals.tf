@@ -142,7 +142,6 @@ locals {
     email_allowed_users_csv = join(",", var.email_allowed_users)
     email_allowed_users_set = length(var.email_allowed_users) > 0
     email_home_address      = var.email_home_address
-    email_home_address_set  = length(trimspace(var.email_home_address)) > 0
     email_allow_all_users   = var.email_allow_all_users
   })
 
